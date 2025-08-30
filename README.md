@@ -1,7 +1,7 @@
 # Agents Use Repo
 
 ## Why?
-AS we step into AI using MCPs and Agents, additional setup can be used to leverage full potential.
+As we step into AI using MCPs and Agents, additional setup can be used to leverage full potential.
 This repo is dedicated to make prompting and AI use easier.
 
 # Setup browser for Playwright MCP example
