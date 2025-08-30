@@ -1,0 +1,10 @@
+{
+  "BRAVE_PATH": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+  "CHROMIUM_PATH": "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "FIREFOX_PATH": "/Applications/Firefox.app/Contents/MacOS/firefox",
+  "REMOTE_DEBUGGING_PORT": 9222,
+  "CHROMIUM_DEBUGGING_PORT": 9223,
+  "FIREFOX_DEBUGGING_PORT": 9224,
+  "USER_DATA_DIR": "/Users/x/Library/Application Support/BraveSoftware/Brave-Browser",
+  "MCP_JSON_PATH": "/Users/x/Library/Application Support/Code/User/mcp.json"
+}
