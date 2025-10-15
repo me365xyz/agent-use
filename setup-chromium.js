@@ -75,13 +75,50 @@ function waitForDevTools(timeout = 10000) {
 
 function updateMcpJson(wsUrl) {
   const mcp = readJsonWithComments(MCP_JSON_PATH);
-  if (!mcp.servers || !mcp.servers.playwright) throw new Error('No playwright server config found');
-  const args = mcp.servers.playwright.args;
-  const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
-  if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
-  else args.push(`--cdp-endpoint=${wsUrl}`);
+  const agent = config.AGENT || 'vscode';
+  
+  let playwrightConfig;
+  
+  if (agent === 'cursor') {
+    // Cursor format: mcpServers.Playwright
+    if (!mcp.mcpServers || !mcp.mcpServers.Playwright) {
+      throw new Error('No Playwright server config found in mcpServers');
+    }
+    playwrightConfig = mcp.mcpServers.Playwright;
+    
+    // For Cursor, we need to update the command to include --cdp-endpoint
+    if (!playwrightConfig.command) {
+      playwrightConfig.command = "npx @playwright/mcp@latest";
+    }
+    
+    // Parse existing command and update/add --cdp-endpoint
+    const commandParts = playwrightConfig.command.split(' ');
+    const cdpIndex = commandParts.findIndex(part => part.startsWith('--cdp-endpoint='));
+    
+    if (cdpIndex !== -1) {
+      commandParts[cdpIndex] = `--cdp-endpoint=${wsUrl}`;
+    } else {
+      commandParts.push(`--cdp-endpoint=${wsUrl}`);
+    }
+    
+    playwrightConfig.command = commandParts.join(' ');
+    
+  } else {
+    // VS Code format: servers.playwright
+    if (!mcp.servers || !mcp.servers.playwright) {
+      throw new Error('No playwright server config found in servers');
+    }
+    playwrightConfig = mcp.servers.playwright;
+    
+    if (!playwrightConfig.args) playwrightConfig.args = [];
+    const args = playwrightConfig.args;
+    const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
+    if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
+    else args.push(`--cdp-endpoint=${wsUrl}`);
+  }
+  
   fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(mcp, null, 2));
-  console.log('Updated mcp.json with new --cdp-endpoint for Chromium');
+  console.log(`Updated mcp.json with new --cdp-endpoint for Chromium (${agent} format)`);
 }
 
 (async () => {
