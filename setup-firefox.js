@@ -110,18 +110,65 @@ function waitForDevTools(timeout = 15000) {
 
 function updateMcpJson(wsUrl) {
   const mcp = readJsonWithComments(MCP_JSON_PATH);
-  if (!mcp.servers || !mcp.servers.playwright) throw new Error('No playwright server config found');
-  const args = mcp.servers.playwright.args;
-  const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
-  if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
-  else args.push(`--cdp-endpoint=${wsUrl}`);
+  const agent = config.AGENT || 'vscode';
+  
+  let playwrightConfig;
+  
+  if (agent === 'cursor') {
+    // Cursor format: mcpServers.Playwright
+    if (!mcp.mcpServers) {
+      mcp.mcpServers = {};
+    }
+    if (!mcp.mcpServers.Playwright) {
+      mcp.mcpServers.Playwright = {
+        command: "npx @playwright/mcp@latest"
+      };
+    }
+    playwrightConfig = mcp.mcpServers.Playwright;
+    
+    // For Cursor, we need to update the command to include --cdp-endpoint
+    if (!playwrightConfig.command) {
+      playwrightConfig.command = "npx @playwright/mcp@latest";
+    }
+    
+    // Parse existing command and update/add --cdp-endpoint
+    const commandParts = playwrightConfig.command.split(' ');
+    const cdpIndex = commandParts.findIndex(part => part.startsWith('--cdp-endpoint='));
+    
+    if (cdpIndex !== -1) {
+      commandParts[cdpIndex] = `--cdp-endpoint=${wsUrl}`;
+    } else {
+      commandParts.push(`--cdp-endpoint=${wsUrl}`);
+    }
+    
+    playwrightConfig.command = commandParts.join(' ');
+    
+  } else {
+    // VS Code format: servers.playwright
+    if (!mcp.servers) {
+      mcp.servers = {};
+    }
+    if (!mcp.servers.playwright) {
+      mcp.servers.playwright = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"]
+      };
+    }
+    playwrightConfig = mcp.servers.playwright;
+    
+    if (!playwrightConfig.args) playwrightConfig.args = [];
+    const args = playwrightConfig.args;
+    const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
+    if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
+    else args.push(`--cdp-endpoint=${wsUrl}`);
+  }
   
   // Note: Firefox uses WebDriver protocol, not Chrome DevTools Protocol
   // You may need to adjust your MCP server configuration for Firefox
   console.log('Warning: Firefox uses WebDriver protocol, not CDP. You may need to adjust your MCP server configuration.');
   
   fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(mcp, null, 2));
-  console.log('Updated mcp.json with new --cdp-endpoint for Firefox');
+  console.log(`Updated mcp.json with new --cdp-endpoint for Firefox (${agent} format)`);
 }
 
 (async () => {

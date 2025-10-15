@@ -81,8 +81,13 @@ function updateMcpJson(wsUrl) {
   
   if (agent === 'cursor') {
     // Cursor format: mcpServers.Playwright
-    if (!mcp.mcpServers || !mcp.mcpServers.Playwright) {
-      throw new Error('No Playwright server config found in mcpServers');
+    if (!mcp.mcpServers) {
+      mcp.mcpServers = {};
+    }
+    if (!mcp.mcpServers.Playwright) {
+      mcp.mcpServers.Playwright = {
+        command: "npx @playwright/mcp@latest"
+      };
     }
     playwrightConfig = mcp.mcpServers.Playwright;
     
@@ -105,8 +110,14 @@ function updateMcpJson(wsUrl) {
     
   } else {
     // VS Code format: servers.playwright
-    if (!mcp.servers || !mcp.servers.playwright) {
-      throw new Error('No playwright server config found in servers');
+    if (!mcp.servers) {
+      mcp.servers = {};
+    }
+    if (!mcp.servers.playwright) {
+      mcp.servers.playwright = {
+        command: "npx",
+        args: ["@playwright/mcp@latest"]
+      };
     }
     playwrightConfig = mcp.servers.playwright;
     
