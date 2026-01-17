@@ -9,7 +9,8 @@ const config = require('./config.json');
 const BRAVE_PATH = config.BRAVE_PATH;
 const REMOTE_DEBUGGING_PORT = config.REMOTE_DEBUGGING_PORT;
 const USER_DATA_DIR = config.USER_DATA_DIR;
-const MCP_JSON_PATH = config.MCP_JSON_PATH;
+// Use Cursor path if AGENT is "cursor", otherwise use VS Code path
+const MCP_JSON_PATH = config.AGENT === 'cursor' ? config.MCP_JSON_PATH_CURSOR : config.MCP_JSON_PATH;
 
 function readJsonWithComments(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
@@ -73,11 +74,33 @@ function waitForDevTools(timeout = 10000) {
 
 function updateMcpJson(wsUrl) {
   const mcp = readJsonWithComments(MCP_JSON_PATH);
-  if (!mcp.servers || !mcp.servers.playwright) throw new Error('No playwright server config found');
-  const args = mcp.servers.playwright.args;
-  const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
-  if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
-  else args.push(`--cdp-endpoint=${wsUrl}`);
+  // Handle both old format (servers.playwright) and new format (mcpServers.Playwright)
+  let playwrightConfig = null;
+  if (mcp.mcpServers && mcp.mcpServers.Playwright) {
+    playwrightConfig = mcp.mcpServers.Playwright;
+  } else if (mcp.servers && mcp.servers.playwright) {
+    playwrightConfig = mcp.servers.playwright;
+  } else if (mcp.servers && mcp.servers.Playwright) {
+    playwrightConfig = mcp.servers.Playwright;
+  }
+  
+  if (!playwrightConfig) throw new Error('No Playwright server config found in mcp.json');
+
+  // Ensure we only keep one --cdp-endpoint and place it in args
+  const stripCdp = (value) => value.replace(/\s*--cdp-endpoint=[^\s]+/g, '').trim();
+  const args = Array.isArray(playwrightConfig.args) ? playwrightConfig.args : [];
+
+  if (typeof playwrightConfig.command === 'string') {
+    // Remove any baked-in --cdp-endpoint from the command string
+    const cleaned = stripCdp(playwrightConfig.command);
+    playwrightConfig.command = cleaned.length ? cleaned : 'npx';
+  }
+
+  // Remove any existing --cdp-endpoint from args and append the fresh one
+  const filteredArgs = args.filter(a => !a.startsWith('--cdp-endpoint='));
+  filteredArgs.push(`--cdp-endpoint=${wsUrl}`);
+  playwrightConfig.args = filteredArgs;
+
   fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(mcp, null, 2));
   console.log('Updated mcp.json with new --cdp-endpoint');
 }

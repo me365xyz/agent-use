@@ -10,7 +10,8 @@ const config = require('./config.json');
 const CHROMIUM_PATH = config.CHROMIUM_PATH || "/Applications/Chromium.app/Contents/MacOS/Chromium";
 const REMOTE_DEBUGGING_PORT = config.CHROMIUM_DEBUGGING_PORT || 9223; // Different port to avoid conflicts
 const USER_DATA_DIR = path.join(require('os').homedir(), 'Library/Application Support/Chromium');
-const MCP_JSON_PATH = config.MCP_JSON_PATH;
+// Use Cursor path if AGENT is "cursor", otherwise use VS Code path
+const MCP_JSON_PATH = config.AGENT === 'cursor' ? config.MCP_JSON_PATH_CURSOR : config.MCP_JSON_PATH;
 
 function readJsonWithComments(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
@@ -75,11 +76,35 @@ function waitForDevTools(timeout = 10000) {
 
 function updateMcpJson(wsUrl) {
   const mcp = readJsonWithComments(MCP_JSON_PATH);
-  if (!mcp.servers || !mcp.servers.playwright) throw new Error('No playwright server config found');
-  const args = mcp.servers.playwright.args;
-  const idx = args.findIndex(a => a.startsWith('--cdp-endpoint='));
-  if (idx !== -1) args[idx] = `--cdp-endpoint=${wsUrl}`;
-  else args.push(`--cdp-endpoint=${wsUrl}`);
+  // Handle both old format (servers.playwright) and new format (mcpServers.Playwright)
+  let playwrightConfig = null;
+  if (mcp.mcpServers && mcp.mcpServers.Playwright) {
+    playwrightConfig = mcp.mcpServers.Playwright;
+  } else if (mcp.servers && mcp.servers.playwright) {
+    playwrightConfig = mcp.servers.playwright;
+  } else if (mcp.servers && mcp.servers.Playwright) {
+    playwrightConfig = mcp.servers.Playwright;
+  }
+  
+  if (!playwrightConfig) throw new Error('No Playwright server config found in mcp.json');
+  
+  // Handle command as string (new format) or args array (old format)
+  if (typeof playwrightConfig.command === 'string') {
+    // Update the --cdp-endpoint in the command string
+    const command = playwrightConfig.command;
+    const cdpRegex = /--cdp-endpoint=[^\s]+/;
+    if (cdpRegex.test(command)) {
+      playwrightConfig.command = command.replace(cdpRegex, `--cdp-endpoint=${wsUrl}`);
+    } else {
+      playwrightConfig.command = `${command} --cdp-endpoint=${wsUrl}`;
+    }
+  } else if (Array.isArray(playwrightConfig.args)) {
+    // Old format with args array
+    const idx = playwrightConfig.args.findIndex(a => a.startsWith('--cdp-endpoint='));
+    if (idx !== -1) playwrightConfig.args[idx] = `--cdp-endpoint=${wsUrl}`;
+    else playwrightConfig.args.push(`--cdp-endpoint=${wsUrl}`);
+  }
+  
   fs.writeFileSync(MCP_JSON_PATH, JSON.stringify(mcp, null, 2));
   console.log('Updated mcp.json with new --cdp-endpoint for Chromium');
 }
